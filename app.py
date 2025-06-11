@@ -1,0 +1,353 @@
+from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask_cors import CORS
+from marketing_genius_tool import MarketingGeniusTool
+import os
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import json
+import paypalrestsdk
+from flask_mail import Mail, Message
+import threading
+
+# Load environment variables
+load_dotenv()
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Initialize PayPal with proper error handling
+try:
+    paypalrestsdk.configure({
+        "mode": os.getenv('PAYPAL_MODE', 'sandbox'),  # sandbox or live
+        "client_id": os.getenv('PAYPAL_CLIENT_ID', 'your_client_id'),
+        "client_secret": os.getenv('PAYPAL_CLIENT_SECRET', 'your_client_secret')
+    })
+except Exception as e:
+    print(f"Error initializing PayPal: {e}")
+
+# Initialize Flask-Mail with proper error handling
+try:
+    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+    mail = Mail(app)
+except Exception as e:
+    print(f"Error initializing Flask-Mail: {e}")
+    mail = None
+
+# Initialize Marketing Genius Tool
+try:
+    tool = MarketingGeniusTool()
+except Exception as e:
+    print(f"Error initializing Marketing Genius Tool: {e}")
+    tool = None
+
+# Simple in-memory storage for subscriptions (replace with database in production)
+subscriptions = {}
+
+def send_email_async(app, msg):
+    """Send email asynchronously."""
+    with app.app_context():
+        try:
+            if mail:
+                mail.send(msg)
+        except Exception as e:
+            print(f"Error sending email: {e}")
+
+def send_email(to, subject, template):
+    """Send email using Flask-Mail."""
+    msg = Message(
+        subject,
+        recipients=[to],
+        html=template
+    )
+    # Send email asynchronously
+    thread = threading.Thread(target=send_email_async, args=(app, msg))
+    thread.start()
+
+def send_trial_welcome_email(email):
+    """Send welcome email for trial subscription."""
+    if not mail:
+        return
+        
+    template = f"""
+    <h2>Welcome to Marketing Genius!</h2>
+    <p>Thank you for starting your 7-day free trial. You now have full access to all features:</p>
+    <ul>
+        <li>AI-Powered Marketing Analysis</li>
+        <li>Custom Campaign Strategies</li>
+        <li>Social Media Recommendations</li>
+        <li>ROI Tracking & Analytics</li>
+    </ul>
+    <p>Your trial ends on {subscriptions[email]['trial_end']}.</p>
+    <p>To continue using the service after your trial, simply subscribe for $20/month.</p>
+    """
+    send_email(email, "Welcome to Your Marketing Genius Trial", template)
+
+def send_trial_ending_email(email):
+    """Send email when trial is ending soon."""
+    if not mail:
+        return
+        
+    template = f"""
+    <h2>Your Marketing Genius Trial is Ending Soon</h2>
+    <p>Your 7-day free trial will end in 3 days. Don't lose access to your marketing insights!</p>
+    <p>Subscribe now for just $20/month to continue using all features:</p>
+    <ul>
+        <li>AI-Powered Marketing Analysis</li>
+        <li>Custom Campaign Strategies</li>
+        <li>Social Media Recommendations</li>
+        <li>ROI Tracking & Analytics</li>
+    </ul>
+    <p><a href="{os.getenv('FRONTEND_URL')}/subscribe">Click here to subscribe now</a></p>
+    """
+    send_email(email, "Your Marketing Genius Trial is Ending Soon", template)
+
+def send_subscription_confirmation_email(email):
+    """Send email when subscription is activated."""
+    if not mail:
+        return
+        
+    template = f"""
+    <h2>Welcome to Marketing Genius Premium!</h2>
+    <p>Thank you for subscribing to Marketing Genius. You now have full access to all premium features.</p>
+    <p>Your subscription will automatically renew each month for $20.</p>
+    <p>If you have any questions, please don't hesitate to contact us.</p>
+    """
+    send_email(email, "Welcome to Marketing Genius Premium", template)
+
+@app.route('/')
+def index():
+    """Render the landing page."""
+    return render_template('index.html')
+
+@app.route('/api/create-subscription', methods=['POST'])
+def create_subscription():
+    """Create a PayPal subscription"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        # Create PayPal subscription plan
+        subscription = paypalrestsdk.Subscription({
+            "plan_id": os.getenv('PAYPAL_PLAN_ID', 'your_plan_id'),
+            "application_context": {
+                "brand_name": "Marketing Genius Tool",
+                "locale": "en-US",
+                "shipping_preference": "NO_SHIPPING",
+                "user_action": "SUBSCRIBE_NOW",
+                "return_url": request.host_url + "success",
+                "cancel_url": request.host_url + "cancel"
+            }
+        })
+        
+        if subscription.create():
+            # Store subscription ID with email
+            subscriptions[email] = {
+                'subscription_id': subscription.id,
+                'is_active': False,
+                'is_trial': True,
+                'trial_end': (datetime.now() + timedelta(days=7)).isoformat()
+            }
+            return jsonify({'approval_url': subscription.links[0].href})
+        else:
+            return jsonify({'error': subscription.error}), 500
+            
+    except Exception as e:
+        print(f"Error creating subscription: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/webhook', methods=['POST'])
+def webhook():
+    """Handle PayPal webhook events"""
+    try:
+        event_type = request.headers.get('PAYPAL-TRANSMISSION-SIG')
+        webhook_id = os.getenv('PAYPAL_WEBHOOK_ID', 'your_webhook_id')
+        
+        # Verify webhook signature
+        if not paypalrestsdk.WebhookEvent.verify(
+            request.headers,
+            request.data,
+            webhook_id
+        ):
+            return jsonify({'error': 'Invalid webhook signature'}), 400
+            
+        event = paypalrestsdk.WebhookEvent.find(request.headers.get('PAYPAL-TRANSMISSION-ID'))
+        
+        if event.event_type == 'BILLING.SUBSCRIPTION.ACTIVATED':
+            # Find email by subscription ID
+            email = next(
+                (email for email, sub in subscriptions.items() 
+                 if sub.get('subscription_id') == event.resource.id),
+                None
+            )
+            
+            if email:
+                subscriptions[email].update({
+                    'is_active': True,
+                    'is_trial': False,
+                    'trial_end': None
+                })
+                send_subscription_confirmation_email(email)
+                
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print(f"Error processing webhook: {e}")
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/subscribe', methods=['POST'])
+def subscribe():
+    """Handle new subscriptions and trial signups."""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        if email in subscriptions:
+            return jsonify({'error': 'Email already subscribed'}), 400
+            
+        # Create new subscription with trial
+        subscriptions[email] = {
+            'is_active': True,
+            'is_trial': True,
+            'trial_end': (datetime.now() + timedelta(days=7)).isoformat()
+        }
+        
+        # Send welcome email
+        send_trial_welcome_email(email)
+        
+        return jsonify({'message': 'Trial subscription activated successfully'})
+        
+    except Exception as e:
+        print(f"Error processing subscription: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/check-subscription', methods=['POST'])
+def check_subscription():
+    """Check subscription status."""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        if email not in subscriptions:
+            return jsonify({'error': 'No subscription found'}), 404
+            
+        subscription = subscriptions[email]
+        
+        # Check if trial has expired
+        if subscription['is_trial']:
+            trial_end = datetime.fromisoformat(subscription['trial_end'])
+            if datetime.now() > trial_end:
+                subscription['is_active'] = False
+                subscription['is_trial'] = False
+            elif (trial_end - datetime.now()).days <= 3:
+                # Send trial ending notification
+                send_trial_ending_email(email)
+        
+        return jsonify(subscription)
+        
+    except Exception as e:
+        print(f"Error checking subscription: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze', methods=['POST'])
+def analyze():
+    """Analyze marketing data"""
+    try:
+        if not tool:
+            return jsonify({'error': 'Marketing Genius Tool not initialized'}), 500
+            
+        data = request.get_json()
+        url = data.get('url')
+        employee_count = data.get('employee_count')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+            
+        # Parse URL to get keywords
+        url_keywords = tool.parse_url_keywords(url)
+        
+        # Classify industry
+        industry = tool.classify_industry(','.join(url_keywords))
+        
+        # Determine business size
+        biz_size = tool.suggest_business_size(employee_count)
+        
+        # Build campaign
+        campaign = tool.build_campaign(url_keywords, industry)
+        
+        # Get marketing strategy
+        strategy = tool.suggest_marketing_strategy(industry, biz_size)
+        
+        # Get social media ideas
+        social_ideas = tool.generate_social_post_ideas(industry)
+        
+        # Predict performance
+        performance = tool.predict_performance(campaign)
+        
+        # Generate A/B test variations
+        ab_variations = tool.ab_test_variations(campaign)
+        
+        # Allocate budget
+        budget_alloc = tool.allocate_budget(campaign, budget=500)
+        
+        # Get schedule
+        schedule = tool.schedule_campaign(campaign)
+        
+        # Get monitoring alerts
+        alerts = tool.monitor_campaign(performance)
+        
+        # Calculate ROI
+        roi = tool.roi_dashboard(spend=500, conversions=30, revenue_per_conversion=25)
+        
+        # Get content strategy
+        content_recs = tool.generate_content_strategy(performance)
+        
+        return jsonify({
+            'keywords': url_keywords,
+            'industry': industry,
+            'business_size': biz_size,
+            'campaign': campaign,
+            'strategy': strategy,
+            'social_ideas': social_ideas,
+            'performance': performance,
+            'ab_variations': ab_variations,
+            'budget_allocation': budget_alloc,
+            'schedule': schedule,
+            'alerts': alerts,
+            'roi': roi,
+            'content_recommendations': content_recs
+        })
+    except Exception as e:
+        print(f"Error analyzing data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint."""
+    return jsonify({'status': 'healthy'})
+
+@app.route('/success')
+def success():
+    """Handle successful payment"""
+    return render_template('index.html')
+
+@app.route('/cancel')
+def cancel():
+    """Handle cancelled payment"""
+    return render_template('index.html')
+
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port) 
