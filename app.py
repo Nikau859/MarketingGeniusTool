@@ -8,6 +8,7 @@ import json
 import paypalrestsdk
 from flask_mail import Mail, Message
 import threading
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -173,39 +174,63 @@ def index():
 
 @app.route('/api/create-subscription', methods=['POST'])
 def create_subscription():
-    """Create a PayPal subscription"""
     try:
         data = request.get_json()
         email = data.get('email')
-        
         if not email:
             return jsonify({'error': 'Email is required'}), 400
-            
-        # Create PayPal subscription plan
-        subscription = paypalrestsdk.Subscription({
-            "plan_id": os.getenv('PAYPAL_PLAN_ID', 'your_plan_id'),
+
+        # 1. Get OAuth2 token from PayPal
+        client_id = os.getenv('PAYPAL_CLIENT_ID')
+        client_secret = os.getenv('PAYPAL_CLIENT_SECRET')
+        auth = (client_id, client_secret)
+        headers = {'Accept': 'application/json', 'Accept-Language': 'en_US'}
+        token_response = requests.post(
+            'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+            headers=headers,
+            data={'grant_type': 'client_credentials'},
+            auth=auth
+        )
+        access_token = token_response.json().get('access_token')
+        if not access_token:
+            return jsonify({'error': 'Could not get PayPal access token'}), 500
+
+        # 2. Create subscription
+        sub_headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
+        sub_data = {
+            "plan_id": os.getenv('PAYPAL_PLAN_ID'),
+            "subscriber": {
+                "email_address": email
+            },
             "application_context": {
                 "brand_name": "Marketing Genius Tool",
                 "locale": "en-US",
                 "shipping_preference": "NO_SHIPPING",
                 "user_action": "SUBSCRIBE_NOW",
-                "return_url": request.host_url + "success",
-                "cancel_url": request.host_url + "cancel"
+                "return_url": "https://geniusmarketingai.netlify.app/success",
+                "cancel_url": "https://geniusmarketingai.netlify.app/cancel"
             }
-        })
-        
-        if subscription.create():
-            # Store subscription ID with email
-            subscriptions[email] = {
-                'subscription_id': subscription.id,
-                'is_active': False,
-                'is_trial': True,
-                'trial_end': (datetime.now() + timedelta(days=7)).isoformat()
-            }
-            return jsonify({'approval_url': subscription.links[0].href})
+        }
+        sub_response = requests.post(
+            'https://api-m.sandbox.paypal.com/v1/billing/subscriptions',
+            headers=sub_headers,
+            json=sub_data
+        )
+        sub_json = sub_response.json()
+        # Find approval link
+        approval_url = None
+        for link in sub_json.get('links', []):
+            if link.get('rel') == 'approve':
+                approval_url = link.get('href')
+                break
+        if approval_url:
+            return jsonify({'approval_url': approval_url})
         else:
-            return jsonify({'error': subscription.error}), 500
-            
+            return jsonify({'error': sub_json}), 500
+
     except Exception as e:
         print(f"Error creating subscription: {e}")
         return jsonify({'error': str(e)}), 500
