@@ -73,13 +73,22 @@ def send_email(email, subject, template):
     except Exception as e:
         print(f"Error sending email: {e}")
 
-def send_trial_welcome_email(email):
+def send_trial_welcome_email(email, name=None):
     """Send welcome email for trial subscription."""
     if not mail:
         return
-        
+
+    greeting = f"Hi {name}," if name else "Hello,"
+
+    # Use your actual Netlify URL and logo file name
+    logo_url = "https://geniusmarketingai.netlify.app/Nikson%20Marketing%20Logo%20V1.png"
+
     template = f"""
+    <div style="text-align:center;">
+        <img src="{logo_url}" alt="Nikson Marketing Logo" style="max-width:180px; margin-bottom:20px;"/>
+    </div>
     <h2>Welcome to Marketing Genius!</h2>
+    <p>{greeting}</p>
     <p>Thank you for starting your 7-day free trial. You now have full access to all features:</p>
     <ul>
         <li>AI-Powered Marketing Analysis</li>
@@ -98,9 +107,9 @@ def send_trial_ending_email(email):
         return
         
     template = f"""
-    <h2>Your Marketing Genius Trial is Ending Soon</h2>
-    <p>Your 7-day free trial will end in 3 days. Don't lose access to your marketing insights!</p>
-    <p>Subscribe now for just $20/month to continue using all features:</p>
+    <h2>Your access to the Nikson Marketing NZ's - Marketing Genius product Trial is Ending Soon</h2>
+    <p>Your 7-day free trial will end in 3 days. Don't lose access to your valuable marketing insights!</p>
+    <p>Invest in marketing that runs while you dont for just $20/month to continue using ALL features:</p>
     <ul>
         <li>AI-Powered Marketing Analysis</li>
         <li>Custom Campaign Strategies</li>
@@ -117,7 +126,7 @@ def send_subscription_confirmation_email(email):
         return
         
     template = f"""
-    <h2>Welcome to Marketing Genius Premium!</h2>
+    <h2>Welcome to Nikson Marketing NZ's - Marketing Genius Premium!</h2>
     <p>Thank you for subscribing to Marketing Genius. You now have full access to all premium features.</p>
     <p>Your subscription will automatically renew each month for $20.</p>
     <p>If you have any questions, please don't hesitate to contact us.</p>
@@ -245,7 +254,8 @@ def subscribe():
     try:
         data = request.get_json()
         email = data.get('email')
-        
+        name = data.get('name')  # Get the name from the request
+
         if not email:
             return jsonify({'error': 'Email is required'}), 400
             
@@ -259,8 +269,8 @@ def subscribe():
             'trial_end': (datetime.now() + timedelta(days=7)).isoformat()
         }
         
-        # Send welcome email
-        send_trial_welcome_email(email)
+        # Send personalized welcome email
+        send_trial_welcome_email(email, name)
         
         return jsonify({'message': 'Trial subscription activated successfully'})
         
