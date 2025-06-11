@@ -348,6 +348,12 @@ def cancel():
     """Handle cancelled payment"""
     return render_template('index.html')
 
+# Add catch-all route for client-side routing
+@app.route('/<path:path>')
+def catch_all(path):
+    """Catch all routes and serve index.html"""
+    return render_template('index.html')
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port, debug=True) 
