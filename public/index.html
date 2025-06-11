@@ -307,31 +307,16 @@
 
         // Handle payment
         async function handlePayment(email) {
-            if (!email) {
-                alert('Please enter a valid email address');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/create-subscription', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok && data.approval_url) {
-                    // Redirect to PayPal approval page
-                    window.location.href = data.approval_url;
-                } else {
-                    alert('Error: ' + (data.error || 'Failed to create subscription'));
-                }
-            } catch (error) {
-                console.error('Error processing payment:', error);
-                alert('Error processing payment. Please try again later.');
+            const response = await fetch('https://marketinggeniustool.onrender.com/api/create-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await response.json();
+            if (response.ok && data.approval_url) {
+                window.location.href = data.approval_url; // This sends user to PayPal
+            } else {
+                alert('Error: ' + (data.error || 'Failed to create subscription'));
             }
         }
 
