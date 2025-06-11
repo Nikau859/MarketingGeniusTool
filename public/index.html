@@ -64,6 +64,31 @@
             text-align: center;
             margin: 20px 0;
         }
+        .feature-locked {
+            opacity: 0.7;
+            position: relative;
+        }
+        .feature-lock-icon {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #666;
+        }
+        .feature-locked .feature-lock-icon {
+            display: block;
+        }
+        .feature-locked::after {
+            content: "Subscribe to Unlock";
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: #4F46E5;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
     </style>
 </head>
 <body>
@@ -88,20 +113,22 @@
         <h2 class="text-center mb-5">Why Choose Marketing Genius?</h2>
         <div class="row">
             <div class="col-md-4">
-                <div class="card feature-card">
+                <div class="card feature-card" data-feature="basic_analysis">
                     <div class="card-body text-center">
-                        <i class="fas fa-robot fa-3x mb-3 text-primary"></i>
-                        <h3>AI-Powered Analysis</h3>
-                        <p>Our advanced AI analyzes your website and provides personalized marketing recommendations.</p>
+                        <i class="fas fa-chart-line fa-3x mb-3 text-primary"></i>
+                        <h3>Basic Analysis</h3>
+                        <p>Get started with basic marketing insights</p>
+                        <i class="fas fa-lock feature-lock-icon"></i>
                     </div>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card feature-card">
+                <div class="card feature-card" data-feature="full_analysis">
                     <div class="card-body text-center">
-                        <i class="fas fa-chart-line fa-3x mb-3 text-primary"></i>
-                        <h3>Data-Driven Insights</h3>
-                        <p>Get actionable insights based on real data and industry best practices.</p>
+                        <i class="fas fa-brain fa-3x mb-3 text-primary"></i>
+                        <h3>AI-Powered Analysis</h3>
+                        <p>Advanced marketing insights powered by AI</p>
+                        <i class="fas fa-lock feature-lock-icon"></i>
                     </div>
                 </div>
             </div>
@@ -326,24 +353,9 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    if (!data.is_active) {
-                        const subscribe = confirm('Your subscription has expired. Would you like to subscribe now?');
-                        if (subscribe) {
-                            await handlePayment(email);
-                        }
-                        return false;
-                    }
-                    if (data.is_trial) {
-                        const trialEnd = new Date(data.trial_end);
-                        const daysLeft = Math.ceil((trialEnd - new Date()) / (1000 * 60 * 60 * 24));
-                        if (daysLeft <= 3) {
-                            const subscribe = confirm(`Your trial ends in ${daysLeft} days. Would you like to subscribe now?`);
-                            if (subscribe) {
-                                await handlePayment(email);
-                            }
-                        }
-                    }
-                    return true;
+                    const features = get_available_features(data);
+                    updateFeatureAccess(features);
+                    return data.is_active;
                 } else {
                     console.error('Subscription check error:', data.error);
                     return false;
@@ -430,49 +442,78 @@
 
         // Function to display results
         function displayResults(data) {
-            const resultsDiv = document.getElementById('results');
-            if (!resultsDiv) return;
-
-            let html = `
-                <h2>Analysis Results</h2>
-                <div class="results-grid">
-                    <div class="result-card">
-                        <h3>Keywords</h3>
-                        <p>${data.keywords.join(', ')}</p>
-                    </div>
-                    <div class="result-card">
-                        <h3>Industry</h3>
-                        <p>${data.industry}</p>
-                    </div>
-                    <div class="result-card">
-                        <h3>Business Size</h3>
-                        <p>${data.business_size}</p>
-                    </div>
-                    <div class="result-card">
-                        <h3>Marketing Strategy</h3>
-                        <p>${data.strategy}</p>
-                    </div>
-                    <div class="result-card">
-                        <h3>Predicted Performance</h3>
+            // Show results container
+            document.getElementById('results').style.display = 'block';
+            
+            // Display each section
+            if (data.keywords) {
+                document.getElementById('keywords').innerHTML = data.keywords.join(', ');
+            }
+            
+            if (data.industry) {
+                document.getElementById('industry').innerHTML = `
+                    <p><strong>Industry:</strong> ${data.industry}</p>
+                    <p><strong>Business Size:</strong> ${data.business_size}</p>
+                `;
+            }
+            
+            if (data.strategy) {
+                document.getElementById('strategy').innerHTML = `<p>${data.strategy}</p>`;
+            }
+            
+            if (data.campaign) {
+                document.getElementById('campaign').innerHTML = `
+                    <h4>Ad Copy</h4>
+                    ${data.campaign.ad_copy.map(ad => `
+                        <div class="mb-3">
+                            <p><strong>Headline:</strong> ${ad.headline}</p>
+                            <p><strong>Description:</strong> ${ad.description}</p>
+                            <p><strong>CTA:</strong> ${ad.cta}</p>
+                        </div>
+                    `).join('')}
+                `;
+            }
+            
+            if (data.performance) {
+                document.getElementById('performance').innerHTML = `
+                    <p><strong>CTR:</strong> ${data.performance.CTR}</p>
+                    <p><strong>CPC:</strong> ${data.performance.CPC}</p>
+                    <p><strong>Conversion Rate:</strong> ${data.performance['Conversion Rate']}</p>
+                `;
+            }
+            
+            if (data.social_ideas) {
+                let socialHtml = '';
+                for (const [platform, ideas] of Object.entries(data.social_ideas)) {
+                    socialHtml += `
+                        <h4>${platform}</h4>
                         <ul>
-                            ${Object.entries(data.performance).map(([key, value]) => 
-                                `<li>${key}: ${value}</li>`
-                            ).join('')}
+                            ${ideas.map(idea => `<li>${idea}</li>`).join('')}
                         </ul>
-                    </div>
-                    <div class="result-card">
-                        <h3>Content Recommendations</h3>
-                        <ul>
-                            ${data.content_recommendations.map(rec => 
-                                `<li>${rec}</li>`
-                            ).join('')}
-                        </ul>
-                    </div>
-                </div>
-            `;
+                    `;
+                }
+                document.getElementById('socialIdeas').innerHTML = socialHtml;
+            }
+            
+            if (data.roi) {
+                document.getElementById('roi').innerHTML = `
+                    <p><strong>Spend:</strong> ${data.roi.Spend}</p>
+                    <p><strong>Conversions:</strong> ${data.roi.Conversions}</p>
+                    <p><strong>Revenue:</strong> ${data.roi.Revenue}</p>
+                    <p><strong>ROAS:</strong> ${data.roi.ROAS}</p>
+                `;
+            }
+        }
 
-            resultsDiv.innerHTML = html;
-            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        function updateFeatureAccess(features) {
+            const featureElements = document.querySelectorAll('.feature-card');
+            featureElements.forEach(element => {
+                const featureId = element.dataset.feature;
+                if (!features[featureId]) {
+                    element.classList.add('feature-locked');
+                    element.querySelector('.feature-lock-icon').style.display = 'block';
+                }
+            });
         }
     </script>
 </body>

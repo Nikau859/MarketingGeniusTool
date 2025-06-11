@@ -57,16 +57,21 @@ def send_email_async(app, msg):
         except Exception as e:
             print(f"Error sending email: {e}")
 
-def send_email(to, subject, template):
-    """Send email using Flask-Mail."""
-    msg = Message(
-        subject,
-        recipients=[to],
-        html=template
-    )
-    # Send email asynchronously
-    thread = threading.Thread(target=send_email_async, args=(app, msg))
-    thread.start()
+def send_email(email, subject, template):
+    """Send email using Flask-Mail"""
+    if not mail:
+        return
+        
+    try:
+        msg = Message(
+            subject=subject,
+            recipients=[email],
+            html=template
+        )
+        # Send email asynchronously
+        threading.Thread(target=send_email_async, args=(app, msg)).start()
+    except Exception as e:
+        print(f"Error sending email: {e}")
 
 def send_trial_welcome_email(email):
     """Send welcome email for trial subscription."""
@@ -119,10 +124,43 @@ def send_subscription_confirmation_email(email):
     """
     send_email(email, "Welcome to Marketing Genius Premium", template)
 
+def get_available_features(subscription):
+    """Get features available based on subscription status"""
+    if not subscription or not subscription.get('is_active'):
+        return {
+            'basic_analysis': True,
+            'full_analysis': False,
+            'social_media_ideas': False,
+            'roi_dashboard': False,
+            'ab_testing': False
+        }
+    
+    return {
+        'basic_analysis': True,
+        'full_analysis': True,
+        'social_media_ideas': True,
+        'roi_dashboard': True,
+        'ab_testing': True
+    }
+
+def check_trial_limits(email):
+    """Check if trial user has exceeded their analysis limit"""
+    subscription = subscriptions.get(email)
+    if subscription and subscription.get('is_trial'):
+        analysis_count = subscription.get('analysis_count', 0)
+        if analysis_count >= 3:  # Limit trial users to 3 analyses
+            return False
+        subscription['analysis_count'] = analysis_count + 1
+    return True
+
+def get_paypal_client_id():
+    """Get PayPal client ID based on environment"""
+    return os.getenv('PAYPAL_CLIENT_ID', 'your_client_id')
+
 @app.route('/')
 def index():
     """Render the landing page."""
-    return render_template('index.html')
+    return render_template('index.html', paypal_client_id=get_paypal_client_id())
 
 @app.route('/api/create-subscription', methods=['POST'])
 def create_subscription():
@@ -265,10 +303,21 @@ def check_subscription():
 def analyze():
     """Analyze marketing data"""
     try:
+        # Check subscription status first
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        # Check if user has active subscription
+        subscription = subscriptions.get(email)
+        if not subscription or not subscription.get('is_active'):
+            return jsonify({'error': 'Active subscription required'}), 403
+            
         if not tool:
             return jsonify({'error': 'Marketing Genius Tool not initialized'}), 500
             
-        data = request.get_json()
         url = data.get('url')
         employee_count = data.get('employee_count')
         
