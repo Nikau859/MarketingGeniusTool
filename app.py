@@ -186,7 +186,7 @@ def create_subscription():
         auth = (client_id, client_secret)
         headers = {'Accept': 'application/json', 'Accept-Language': 'en_US'}
         token_response = requests.post(
-            'https://api-m.sandbox.paypal.com/v1/oauth2/token',
+            'https://api-m.paypal.com/v1/oauth2/token',
             headers=headers,
             data={'grant_type': 'client_credentials'},
             auth=auth
@@ -215,7 +215,7 @@ def create_subscription():
             }
         }
         sub_response = requests.post(
-            'https://api-m.sandbox.paypal.com/v1/billing/subscriptions',
+            'https://api-m.paypal.com/v1/billing/subscriptions',
             headers=sub_headers,
             json=sub_data
         )
@@ -437,6 +437,81 @@ def cancel():
 def catch_all(path):
     """Catch all routes and serve index.html"""
     return render_template('index.html')
+
+@app.route('/api/orders', methods=['POST'])
+def create_order():
+    try:
+        cart = request.json.get('cart', [])
+        item = cart[0] if cart else {}
+        price = item.get('price', '20.00')  # Default to $20 if not specified
+        
+        # Create PayPal order
+        payment = paypalrestsdk.Payment({
+            "intent": "sale",
+            "payer": {
+                "payment_method": "paypal"
+            },
+            "transactions": [{
+                "amount": {
+                    "total": price,
+                    "currency": "USD",
+                    "details": {
+                        "subtotal": price
+                    }
+                },
+                "item_list": {
+                    "items": [{
+                        "name": "Marketing Genius Premium Subscription",
+                        "price": price,
+                        "currency": "USD",
+                        "quantity": 1,
+                        "description": "Monthly Premium Subscription - AI-Powered Marketing Insights"
+                    }]
+                },
+                "description": "Marketing Genius Premium Subscription"
+            }],
+            "redirect_urls": {
+                "return_url": "https://geniusmarketingai.netlify.app/success",
+                "cancel_url": "https://geniusmarketingai.netlify.app/cancel"
+            }
+        })
+
+        if payment.create():
+            return jsonify({
+                "id": payment.id,
+                "status": payment.state
+            })
+        else:
+            return jsonify({"error": payment.error}), 400
+
+    except Exception as e:
+        print("Failed to create order:", str(e))
+        return jsonify({"error": "Failed to create order"}), 500
+
+@app.route('/api/orders/<order_id>/capture', methods=['POST'])
+def capture_order(order_id):
+    try:
+        payment = paypalrestsdk.Payment.find(order_id)
+        
+        if payment.execute({"payer_id": request.json.get('payerID')}):
+            return jsonify({
+                "id": payment.id,
+                "status": payment.state,
+                "purchase_units": [{
+                    "payments": {
+                        "captures": [{
+                            "id": payment.transactions[0].related_resources[0].sale.id,
+                            "status": payment.transactions[0].related_resources[0].sale.state
+                        }]
+                    }
+                }]
+            })
+        else:
+            return jsonify({"error": payment.error}), 400
+
+    except Exception as e:
+        print("Failed to capture order:", str(e))
+        return jsonify({"error": "Failed to capture order"}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))

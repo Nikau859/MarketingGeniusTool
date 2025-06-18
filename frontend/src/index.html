@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Marketing Genius Tool - Premium Subscription</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body>
+        <div class="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
+                <h1 class="text-3xl font-bold text-center text-gray-900 mb-8">
+                    Subscribe to Premium
+                </h1>
+                <div class="space-y-6">
+                    <p class="text-gray-600 text-center">
+                        Get access to all premium features with our subscription plan
+                    </p>
+                    <div id="paypal-button-container"></div>
+                    <p id="result-message" class="mt-4 text-center"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initialize the JS-SDK -->
+        <script
+            src="https://www.paypal.com/sdk/js?client-id=AS9uJlgpWTTPCMaHhmRY6JrqwLJVJBsW_TNssDpoDz9LnqtmBDbVfV7ILB6-IvqwmankSuJdBI3R2BbE&buyer-country=US&currency=USD&components=buttons&enable-funding=venmo,paylater,card&vault=true&intent=subscription"
+            data-sdk-integration-source="developer-studio"
+        ></script>
+        <script src="app.js"></script>
+    </body>
+</html> 
