@@ -9,12 +9,36 @@ import paypalrestsdk
 from flask_mail import Mail, Message
 import threading
 import requests
+from functools import wraps
+import secrets
+import time
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Configure CORS to only allow requests from your Netlify domain
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [
+            "https://geniusmarketingai.netlify.app",
+            "http://localhost:3000"  # For local development
+        ],
+        "methods": ["GET", "POST"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+
+# Security headers middleware
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://www.paypal.com https://www.paypalobjects.com; frame-src 'self' https://www.paypal.com; style-src 'self' 'unsafe-inline';"
+    return response
 
 # Initialize PayPal with proper error handling
 try:
@@ -441,10 +465,23 @@ def catch_all(path):
 @app.route('/api/orders', methods=['POST'])
 def create_order():
     try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({"error": "Content-Type must be application/json"}), 400
+
         cart = request.json.get('cart', [])
+        if not cart:
+            return jsonify({"error": "Cart is required"}), 400
+
         item = cart[0] if cart else {}
-        price = item.get('price', '20.00')  # Default to $20 if not specified
+        price = item.get('price', '20.00')
         
+        # Validate price
+        try:
+            float(price)
+        except ValueError:
+            return jsonify({"error": "Invalid price format"}), 400
+
         # Create PayPal order
         payment = paypalrestsdk.Payment({
             "intent": "sale",
@@ -491,9 +528,17 @@ def create_order():
 @app.route('/api/orders/<order_id>/capture', methods=['POST'])
 def capture_order(order_id):
     try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({"error": "Content-Type must be application/json"}), 400
+
+        payer_id = request.json.get('payerID')
+        if not payer_id:
+            return jsonify({"error": "payerID is required"}), 400
+
         payment = paypalrestsdk.Payment.find(order_id)
         
-        if payment.execute({"payer_id": request.json.get('payerID')}):
+        if payment.execute({"payer_id": payer_id}):
             return jsonify({
                 "id": payment.id,
                 "status": payment.state,

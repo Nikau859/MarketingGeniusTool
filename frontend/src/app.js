@@ -8,6 +8,12 @@ const paypalButtons = window.paypal.Buttons({
     },
     async createOrder() {
         try {
+            // Validate price before sending to backend
+            const price = "20.00";
+            if (isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
+                throw new Error("Invalid price");
+            }
+
             const response = await fetch("http://localhost:5000/api/orders", {
                 method: "POST",
                 headers: {
@@ -18,11 +24,16 @@ const paypalButtons = window.paypal.Buttons({
                         {
                             id: "premium_subscription",
                             quantity: "1",
-                            price: "20.00"
+                            price: price
                         },
                     ],
                 }),
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to create order");
+            }
 
             const orderData = await response.json();
 
@@ -37,11 +48,15 @@ const paypalButtons = window.paypal.Buttons({
             throw new Error(errorMessage);
         } catch (error) {
             console.error(error);
-            resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+            resultMessage(`Could not initiate PayPal Checkout...<br><br>${error.message}`);
         }
     },
     async onApprove(data, actions) {
         try {
+            if (!data.orderID || !data.payerID) {
+                throw new Error("Missing order or payer information");
+            }
+
             const response = await fetch(
                 `http://localhost:5000/api/orders/${data.orderID}/capture`,
                 {
@@ -54,6 +69,11 @@ const paypalButtons = window.paypal.Buttons({
                     })
                 }
             );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to capture payment");
+            }
 
             const orderData = await response.json();
             const errorDetail = orderData?.details?.[0];
@@ -84,7 +104,7 @@ const paypalButtons = window.paypal.Buttons({
         } catch (error) {
             console.error(error);
             resultMessage(
-                `Sorry, your subscription could not be processed...<br><br>${error}`
+                `Sorry, your subscription could not be processed...<br><br>${error.message}`
             );
         }
     },
@@ -99,5 +119,14 @@ paypalButtons.render("#paypal-button-container");
 // Function to show result messages to the user
 function resultMessage(message) {
     const container = document.querySelector("#result-message");
-    container.innerHTML = message;
+    if (container) {
+        // Sanitize message to prevent XSS
+        const sanitizedMessage = message
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        container.innerHTML = sanitizedMessage;
+    }
 } 
