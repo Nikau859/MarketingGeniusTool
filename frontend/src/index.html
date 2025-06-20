@@ -62,89 +62,13 @@
         </script>
     </head>
     <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-        <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-            <!-- Header with Theme Switcher -->
-            <div class="max-w-7xl mx-auto mb-12">
-                <div class="flex justify-between items-center mb-8">
-                    <div class="text-left">
-                        <h1 class="text-4xl md:text-5xl font-bold text-gradient font-display mb-4">
-                            Marketing Genius Tool
-                        </h1>
-                        <p class="text-xl text-gray-600 max-w-2xl">
-                            Unlock the power of AI-driven marketing with our premium subscription
-                        </p>
-                    </div>
-                    <div id="theme-switcher-container" class="hidden md:block">
-                        <!-- Theme switcher will be rendered here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Content -->
-            <div class="max-w-4xl mx-auto">
-                <!-- Features Grid -->
-                <div class="grid md:grid-cols-3 gap-8 mb-12 slide-up">
-                    <div class="card-modern text-center">
-                        <div class="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-2">AI-Powered Insights</h3>
-                        <p class="text-gray-600">Get intelligent marketing recommendations powered by advanced AI algorithms</p>
-                    </div>
-                    
-                    <div class="card-modern text-center">
-                        <div class="w-16 h-16 bg-gradient-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Advanced Analytics</h3>
-                        <p class="text-gray-600">Track performance with detailed analytics and actionable insights</p>
-                    </div>
-                    
-                    <div class="card-modern text-center">
-                        <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Premium Support</h3>
-                        <p class="text-gray-600">Get priority support and exclusive access to new features</p>
-                    </div>
-                </div>
-
-                <!-- Subscription Card -->
-                <div class="card-modern max-w-md mx-auto text-center slide-up">
-                    <div class="mb-6">
-                        <h2 class="text-3xl font-bold text-gray-900 mb-2">
-                            Subscribe to Premium
-                        </h2>
-                        <p class="text-gray-600">
-                            Get access to all premium features with our subscription plan
-                        </p>
-                    </div>
-                    
-                    <!-- Pricing -->
-                    <div class="bg-gradient-primary text-white rounded-lg p-6 mb-6">
-                        <div class="text-4xl font-bold mb-2">$20</div>
-                        <div class="text-lg opacity-90">per month</div>
-                    </div>
-                    
-                    <div class="space-y-6">
-                        <div id="paypal-button-container"></div>
-                        <p id="result-message" class="mt-4 text-center font-medium"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="root"></div>
 
         <!-- Initialize the JS-SDK -->
         <script
             src="https://www.paypal.com/sdk/js?client-id=AS9uJlgpWTTPCMaHhmRY6JrqwLJVJBsW_TNssDpoDz9LnqtmBDbVfV7ILB6-IvqwmankSuJdBI3R2BbE&buyer-country=US&currency=USD&components=buttons&enable-funding=venmo,paylater,card&vault=true&intent=subscription"
             data-sdk-integration-source="developer-studio"
         ></script>
-        <script src="app.js"></script>
+        <script type="module" src="/src/main.tsx"></script>
     </body>
 </html> 

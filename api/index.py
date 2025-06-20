@@ -23,7 +23,13 @@ CORS(app, resources={
     r"/api/*": {
         "origins": [
             "https://geniusmarketingai.netlify.app",
-            "http://localhost:3000"  # For local development
+            "http://localhost:3000",  # For local development
+            "http://localhost:5173",  # Vite default port
+            "http://localhost:5174",  # Vite alternative port
+            "http://localhost:4173",  # Vite preview port
+            "http://127.0.0.1:5173",  # Vite alternative
+            "http://127.0.0.1:5174",  # Vite alternative port
+            "http://127.0.0.1:4173"   # Vite preview alternative
         ],
         "methods": ["GET", "POST"],
         "allow_headers": ["Content-Type"]
@@ -558,6 +564,9 @@ def capture_order(order_id):
         print("Failed to capture order:", str(e))
         return jsonify({"error": "Failed to capture order"}), 500
 
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True) 
+if __name__ == "__main__":
+    # This block is for local development, not for serverless deployment
+    app.run(debug=True, port=5000)
+else:
+    # This is for serverless execution
+    handler = app 
