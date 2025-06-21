@@ -1,7 +1,6 @@
 [build]
-  base    = "frontend"
-  command = "npm run build"
-  publish = "dist"
+  command = "cd frontend && npm run build"
+  publish = "frontend/dist"
   functions = "api"
 
 [build.environment]
@@ -19,11 +18,3 @@
   from = "/*"
   to = "/index.html"
   status = 200 
-
-[dev]
-  command = "npm run dev"
-  port = 5173
-  publish = "dist"
-  targetPort = 5173
-  framework = "#static"
-  functions = "api" 
