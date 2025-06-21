@@ -106,8 +106,6 @@ function App() {
               </div>
               
               <div className="space-y-6">
-                <div id="paypal-button-container"></div>
-                <p id="result-message" className="mt-4 text-center font-medium"></p>
                 <PayPalButton />
               </div>
             </div>
