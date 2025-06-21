@@ -53,7 +53,7 @@ function App() {
 
       {/* Page Content */}
       <div className="max-w-4xl mx-auto">
-        {currentPage === 'subscription' ? (
+        {currentPage === 'subscription' && (
           <>
             {/* Features Grid */}
             <div className="grid md:grid-cols-3 gap-8 mb-12 slide-up">
@@ -110,9 +110,9 @@ function App() {
               </div>
             </div>
           </>
-        ) : (
-          <MarketingAnalysisTool />
         )}
+
+        {currentPage === 'analysis' && <MarketingAnalysisTool />}
       </div>
     </div>
   )
