@@ -1,12 +1,44 @@
 import { useState } from 'react';
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+
+// This component is a wrapper for the PayPalButtons to access the script loading state
+const ButtonWrapper = ({ createOrder, onApprove, onError, setMessage } : { createOrder: () => Promise<string>, onApprove: (data: any) => Promise<void>, onError: (err: any) => void, setMessage: (message: string) => void }) => {
+    const [{ isPending, isRejected }] = usePayPalScriptReducer();
+
+    if (isPending) {
+        return (
+            <div className="flex justify-center items-center p-4">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900"></div>
+            </div>
+        );
+    }
+
+    if (isRejected) {
+        setMessage("Error: Failed to load PayPal script. Please check your internet connection or try again later.");
+        return null;
+    }
+
+    return (
+        <PayPalButtons
+            style={{
+                shape: 'rect',
+                layout: 'vertical',
+                color: 'gold',
+                label: 'subscribe',
+            }}
+            createOrder={createOrder}
+            onApprove={onApprove}
+            onError={onError}
+        />
+    );
+};
 
 const PayPalButton = () => {
     const [message, setMessage] = useState('');
     const payPalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;
 
     if (!payPalClientId) {
-        return <div className="text-red-500">Error: PayPal Client ID is not configured.</div>;
+        return <div className="text-red-500 font-medium p-4 text-center">Error: PayPal Client ID is not configured.</div>;
     }
 
     const initialOptions = {
@@ -33,7 +65,7 @@ const PayPalButton = () => {
         } catch (error) {
             console.error(error);
             setMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
-            return '';
+            throw error;
         }
     };
 
@@ -63,20 +95,17 @@ const PayPalButton = () => {
     };
 
     return (
-        <PayPalScriptProvider options={initialOptions}>
-            <PayPalButtons
-                style={{
-                    shape: 'rect',
-                    layout: 'vertical',
-                    color: 'gold',
-                    label: 'subscribe',
-                }}
-                createOrder={createOrder}
-                onApprove={onApprove}
-                onError={onError}
-            />
+        <div className="w-full">
+            <PayPalScriptProvider options={initialOptions}>
+                <ButtonWrapper 
+                    createOrder={createOrder}
+                    onApprove={onApprove}
+                    onError={onError}
+                    setMessage={setMessage}
+                />
+            </PayPalScriptProvider>
             {message && <div id="result-message" dangerouslySetInnerHTML={{ __html: message }} className="mt-4 text-center" />}
-        </PayPalScriptProvider>
+        </div>
     );
 };
 
