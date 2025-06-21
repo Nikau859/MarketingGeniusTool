@@ -76,12 +76,14 @@ const MarketingAnalysisTool = () => {
     setIsLoading(true);
     setError('');
     setResults(null);
+    const token = localStorage.getItem('jwt_token');
 
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           url: url.trim(),
@@ -96,15 +98,10 @@ const MarketingAnalysisTool = () => {
         setResults(data);
         setShowEmailModal(false);
       } else {
-        if (response.status === 403) {
-          setError('Active subscription required. Please subscribe to use this feature.');
-          setShowEmailModal(true);
-        } else {
-          setError(data.error || 'Failed to analyze website');
-        }
+        setError(data.message || data.error || 'Failed to analyze website');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError('A network error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -115,8 +112,8 @@ const MarketingAnalysisTool = () => {
       setError('Please enter a valid email address');
       return;
     }
-
-    // Try to start a trial subscription
+    
+    setIsLoading(true);
     try {
       const response = await fetch('/api/subscribe', {
         method: 'POST',
@@ -129,14 +126,16 @@ const MarketingAnalysisTool = () => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('userEmail', email.trim());
+        localStorage.setItem('jwt_token', data.token);
         setShowEmailModal(false);
         await performAnalysis(email.trim());
       } else {
         setError(data.error || 'Failed to start trial');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError('A network error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -12,6 +12,7 @@ import requests
 from functools import wraps
 import secrets
 import time
+import jwt
 
 # Load environment variables
 load_dotenv()
@@ -58,7 +59,7 @@ except Exception as e:
 
 # Initialize Flask-Mail with proper error handling
 try:
-    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER')
     app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
     app.config['MAIL_USE_TLS'] = True
     app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
@@ -563,6 +564,117 @@ def capture_order(order_id):
     except Exception as e:
         print("Failed to capture order:", str(e))
         return jsonify({"error": "Failed to capture order"}), 500
+
+# --- JWT Auth Decorator ---
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(" ")[1]
+
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+
+        try:
+            data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+            # The 'exp' claim is automatically checked by jwt.decode
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired!'}), 401
+        except Exception as e:
+            return jsonify({'message': 'Token is invalid!', 'error': str(e)}), 401
+
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/api/analyze', methods=['POST'])
+@token_required
+def analyze():
+    """Analyze marketing data"""
+    try:
+        # Check subscription status first
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        # Check if user has active subscription
+        subscription = subscriptions.get(email)
+        if not subscription or not subscription.get('is_active'):
+            return jsonify({'error': 'Active subscription required'}), 403
+            
+        if not tool:
+            return jsonify({'error': 'Marketing Genius Tool not initialized'}), 500
+            
+        url = data.get('url')
+        employee_count = data.get('employee_count')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+            
+        # Parse URL to get keywords
+        url_keywords = tool.parse_url_keywords(url)
+        
+        # Classify industry
+        industry = tool.classify_industry(','.join(url_keywords))
+        
+        # Determine business size
+        biz_size = tool.suggest_business_size(employee_count)
+        
+        # Build campaign
+        campaign = tool.build_campaign(url_keywords, industry)
+        
+        # Get marketing strategy
+        strategy = tool.suggest_marketing_strategy(industry, biz_size)
+        
+        # Get social media ideas
+        social_ideas = tool.generate_social_post_ideas(industry)
+        
+        # Predict performance
+        performance = tool.predict_performance(campaign)
+        
+        # Generate A/B test variations
+        ab_variations = tool.ab_test_variations(campaign)
+        
+        # Allocate budget
+        budget_alloc = tool.allocate_budget(campaign, budget=500)
+        
+        # Get schedule
+        schedule = tool.schedule_campaign(campaign)
+        
+        # Get monitoring alerts
+        alerts = tool.monitor_campaign(performance)
+        
+        # Calculate ROI
+        roi = tool.roi_dashboard(spend=500, conversions=30, revenue_per_conversion=25)
+        
+        # Get content strategy
+        content_recs = tool.generate_content_strategy(performance)
+        
+        return jsonify({
+            'keywords': url_keywords,
+            'industry': industry,
+            'business_size': biz_size,
+            'campaign': campaign,
+            'strategy': strategy,
+            'social_ideas': social_ideas,
+            'performance': performance,
+            'ab_variations': ab_variations,
+            'budget_allocation': budget_alloc,
+            'schedule': schedule,
+            'alerts': alerts,
+            'roi': roi,
+            'content_recommendations': content_recs
+        })
+    except Exception as e:
+        print(f"Error analyzing data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint."""
+    return jsonify({'status': 'healthy'})
 
 if __name__ == "__main__":
     # This block is for local development, not for serverless deployment
