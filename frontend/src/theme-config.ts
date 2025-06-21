@@ -207,7 +207,7 @@ export function getCSSVariables(): Record<string, string> {
 }
 
 // Helper function to apply theme to document
-export function applyTheme(theme: ThemeConfig = themeConfig): void {
+export function applyTheme(): void {
   const root = document.documentElement;
   const variables = getCSSVariables();
   

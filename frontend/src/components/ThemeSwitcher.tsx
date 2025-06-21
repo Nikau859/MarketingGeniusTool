@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { themeConfig, applyTheme } from '../theme-config';
 
 interface ThemeSwitcherProps {
   className?: string;
